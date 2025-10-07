@@ -2,10 +2,10 @@ import logging
 import re
 import time
 from decimal import Decimal
+from difflib import SequenceMatcher
 from pathlib import Path
 
 import msgspec
-from PIL import ImageChops
 from playwright.sync_api import (
     BrowserContext,
     Page,
@@ -293,21 +293,15 @@ class BoursoScraper:
                 testBatch.append(button)
 
         for button in testBatch:
-            button.image
-            minDiff = 99999999
+            maxRatio = 0
             bestMatch: Button | None = None
 
             for referenceImage in referenceButtons:
-                diff = ImageChops.difference(referenceImage.image, button.image)
-
-                totalDiff = 0
-                for x in range(0, diff.width):
-                    for y in range(0, diff.height):
-                        pixel = diff.getpixel((x, y))
-                        if isinstance(pixel, tuple):
-                            totalDiff += pixel[0] + pixel[1] + pixel[2]
-                if totalDiff < minDiff:
-                    minDiff = totalDiff
+                similarityRatio = SequenceMatcher(
+                    None, referenceImage.svgStr, button.svgStr
+                ).ratio()
+                if similarityRatio > maxRatio:
+                    maxRatio = similarityRatio
                     bestMatch = referenceImage
 
             if bestMatch is not None:
