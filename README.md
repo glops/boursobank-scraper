@@ -2,7 +2,7 @@
 
 Ce projet a pour objectif de récupérer les données des opérations bancaires depuis le site web de BoursoBank.
 
-Il utilise la librairie playwright pour naviguer sur le site de la banque.
+Il utilise la librairie [Playwright](https://playwright.dev/python/) pour naviguer sur le site de la banque.
 
 ## Format des données
 
@@ -41,6 +41,16 @@ Les anciennes opérations en traitement sont enregistrées dans le répertoire `
 ```bash
 uv tool install boursobank-scraper
 ```
+
+Installation du navigateur Chromium pour playwright.
+
+
+```bash
+playwright-bbs install chromium
+```
+
+> La commande playwright-bbs est identique à la commande playwright du projet [Playwright](https://playwright.dev/python/). Elle est juste nommé différemment pour ne pas interférer avec une autre version qui serait installée en parallèle.
+
 
 ### Configuration
 
