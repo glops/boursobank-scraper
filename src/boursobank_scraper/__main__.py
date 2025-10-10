@@ -12,25 +12,23 @@ from boursobank_scraper.config import Config
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data-folder", help="Chemin vers le répertoire de données")
+    parser.add_argument(
+        "--data-folder",
+        help="Chemin vers le répertoire de données. Si non spécifié, utilise le répertoire courant.",
+    )
     args = parser.parse_args()
 
     rootDataPath = None
     if args.data_folder is not None:
         rootDataPath = Path(args.data_folder)
-    else:
-        guessPaths: list[Path] = [
-            Path.cwd() / "boursobank-scraper",
-            Path.home() / "boursobank-scraper",
-            Path.home() / ".config" / "boursobank-scraper",
-        ]
-        for rootDataPath in guessPaths:
-            if rootDataPath.exists():
-                break
-
-        if rootDataPath is None or not rootDataPath.exists():
-            print("Le répertoire de données n'a pas été trouver.")
+        if not rootDataPath.exists():
+            print(f"Le répertoire '{rootDataPath}' n'existe pas.")
             exit(1)
+        elif not rootDataPath.is_dir():
+            print(f"'{rootDataPath}' n'est pas un répertoire.")
+            exit(1)
+    else:
+        rootDataPath = Path.cwd()
 
     configPath = rootDataPath / "config.yaml"
     if not (rootDataPath / "config.yaml").exists():
