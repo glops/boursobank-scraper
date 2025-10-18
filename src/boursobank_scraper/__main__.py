@@ -45,9 +45,7 @@ def main() -> None:
             exit(1)
 
     logger = logging.getLogger(__name__)
-    logPath = (
-        rootDataPath / "log" / f"import_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-    )
+    logPath = rootDataPath / "log" / f"import_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     logPath.parent.mkdir(exist_ok=True)
 
     logging.basicConfig(filename=logPath, encoding="utf-8", level=logging.DEBUG)
@@ -56,9 +54,7 @@ def main() -> None:
     logger.info(f"Headless mode: {config.headless}")
     logger.info(f"Data path: {rootDataPath}")
     try:
-        boursoScraper = BoursoScraper(
-            str(config.username), str(config.password), rootDataPath, config.headless
-        )
+        boursoScraper = BoursoScraper(str(config.username), str(config.password), rootDataPath, config.headless)
 
         if boursoScraper.connect():
             accounts = list(boursoScraper.listAccounts())

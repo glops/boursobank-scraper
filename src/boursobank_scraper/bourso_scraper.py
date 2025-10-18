@@ -21,9 +21,7 @@ from boursobank_scraper.reference_buttons import referenceButtons
 
 
 class BoursoScraper:
-    def __init__(
-        self, username: str, password: str, rootDataPath: Path, headless: bool = True
-    ):
+    def __init__(self, username: str, password: str, rootDataPath: Path, headless: bool = True):
         self.logger = logging.getLogger(__name__)
 
         self.apiUrl = "https://clients.boursobank.com"
@@ -70,9 +68,7 @@ class BoursoScraper:
 
             if self.contextFile.is_file():
                 self.logger.debug("Login state exists. Load it")
-                self.context = self.browser.new_context(
-                    storage_state=self.contextFile, accept_downloads=True
-                )
+                self.context = self.browser.new_context(storage_state=self.contextFile, accept_downloads=True)
                 self.context.tracing.start(screenshots=True, snapshots=True)
                 self.page = self.context.new_page()
                 self.page.set_default_timeout(30000)
@@ -121,9 +117,7 @@ class BoursoScraper:
                     # This is not an account (insurrance). Skip
                     continue
                 balance = self.cleanAmount(balanceEl.text_content() or "")
-                accountLabelEl = accountEl.query_selector(
-                    "span.c-info-box__account-label"
-                )
+                accountLabelEl = accountEl.query_selector("span.c-info-box__account-label")
                 if accountLabelEl is None:
                     # This is not an account (Tous mes comptes). Skip
                     continue
@@ -160,12 +154,8 @@ class BoursoScraper:
             return
         try:
             listOperationSeenId: set[str] = set()
-            listOperationId = {
-                f.stem for f in accountTransacPath.glob("20*/*/*/*.json")
-            }
-            listPendingOperationId = {
-                f.stem for f in oldAuthorizationPath.glob("*.json")
-            }
+            listOperationId = {f.stem for f in accountTransacPath.glob("20*/*/*/*.json")}
+            listPendingOperationId = {f.stem for f in oldAuthorizationPath.glob("*.json")}
 
             if self.page.url != account.link:
                 self.logger.debug(f"opening transaction details page : {account.link}")
@@ -175,9 +165,7 @@ class BoursoScraper:
 
             while True:
                 operationCount = len(listOperationId)
-                rowTransactionEls = self.page.query_selector_all(
-                    "ul.list__movement > li.list-operation-item"
-                )
+                rowTransactionEls = self.page.query_selector_all("ul.list__movement > li.list-operation-item")
 
                 for rowEl in rowTransactionEls:
                     labelEl = rowEl.query_selector(".list-operation-item__label")
@@ -190,77 +178,52 @@ class BoursoScraper:
                     if operationId in listPendingOperationId:
                         # The operation is pending and the file already exist in the old folder
                         transactionPath = oldAuthorizationPath / f"{operationId}.json"
-                        transactionPath.rename(
-                            newAuthorizationPath / transactionPath.name
-                        )
+                        transactionPath.rename(newAuthorizationPath / transactionPath.name)
                     elif operationId not in listOperationId:
                         listOperationId.add(operationId)
 
-                        with self.page.expect_response(
-                            re.compile(".*operation.*")
-                        ) as response_info:
+                        with self.page.expect_response(re.compile(".*operation.*")) as response_info:
                             labelEl.click()
                         try:
-                            operation = msgspec.json.decode(
-                                response_info.value.body(), type=BoursoApiOperation
-                            )
+                            operation = msgspec.json.decode(response_info.value.body(), type=BoursoApiOperation)
                             opDate = operation.getDate()
                             if (
                                 operation.operation.status.id == "authorization"
                                 or "READ_ONLY" in operation.operation.flags
                             ):
                                 newPendingOperationCount += 1
-                                transactionPath = (
-                                    newAuthorizationPath
-                                    / f"{operation.operation.id}.json"
-                                )
+                                transactionPath = newAuthorizationPath / f"{operation.operation.id}.json"
                             elif opDate is not None:
                                 newOperationCount += 1
                                 year, month, day = opDate.split("-")
                                 transactionPath = (
-                                    accountTransacPath
-                                    / year
-                                    / month
-                                    / day
-                                    / f"{operation.operation.id}.json"
+                                    accountTransacPath / year / month / day / f"{operation.operation.id}.json"
                                 )
                             else:
-                                transactionPath = (
-                                    accountTransacPath
-                                    / "unknown_date"
-                                    / f"{operation.operation.id}.json"
-                                )
+                                transactionPath = accountTransacPath / "unknown_date" / f"{operation.operation.id}.json"
                         except msgspec.ValidationError:
-                            transactionPath = (
-                                accountTransacPath / "invalid" / f"{operationId}.json"
-                            )
+                            transactionPath = accountTransacPath / "invalid" / f"{operationId}.json"
 
                         if not transactionPath.exists():
                             transactionPath.parent.mkdir(exist_ok=True, parents=True)
                             self.logger.debug(f"Saving {transactionPath}")
                             transactionPath.write_bytes(response_info.value.body())
                     elif operationId in listOperationId:
-                        self.logger.debug(
-                            f"Operation {operationId} already exists, skipping"
-                        )
+                        self.logger.debug(f"Operation {operationId} already exists, skipping")
                         countExisting += 1
 
                 if operationCount == len(listOperationId) or countExisting > 50:
                     # If no more operation has been found, stop.
                     break
                 else:
-                    nextPageLink = self.page.query_selector(
-                        "li.list__movement__range-summary > a"
-                    )
+                    nextPageLink = self.page.query_selector("li.list__movement__range-summary > a")
                     if nextPageLink is None:
                         self.logger.debug("No next page link found")
                         break
                     self.logger.info("Click next page link")
                     nextPageLink.click()
                     time.sleep(1)
-                    nextPageLink = self.page.query_selector(
-                        "li.list__movement__range-summary > a"
-                    )
+                    nextPageLink = self.page.query_selector("li.list__movement__range-summary > a")
                     self.logger.info("Load done")
 
             self.logger.info(
@@ -274,9 +237,7 @@ class BoursoScraper:
             raise
 
     def decryptPassword(self):
-        self.page.wait_for_selector(
-            "div.sasmap > ul > li > button > img", state="visible"
-        )
+        self.page.wait_for_selector("div.sasmap > ul > li > button > img", state="visible")
         time.sleep(1)
         vKeys = self.page.query_selector_all("div.sasmap > ul > li > button > img")
 
@@ -301,9 +262,7 @@ class BoursoScraper:
             bestMatch: Button | None = None
 
             for referenceImage in referenceButtons:
-                similarityRatio = SequenceMatcher(
-                    None, referenceImage.svgStr, button.svgStr
-                ).ratio()
+                similarityRatio = SequenceMatcher(None, referenceImage.svgStr, button.svgStr).ratio()
                 if similarityRatio > maxRatio:
                     maxRatio = similarityRatio
                     bestMatch = referenceImage
@@ -323,23 +282,13 @@ class BoursoScraper:
         self.logger.debug(f"Load accounts page : {url}")
         self.page.goto(url)
 
-        self.locatorCookies = self.page.get_by_role(
-            "button", name="Continuer sans accepter →"
-        )
-        self.locatorId = self.page.get_by_role(
-            "textbox", name="Saisissez votre identifiant"
-        )
+        self.locatorCookies = self.page.get_by_role("button", name="Continuer sans accepter →")
+        self.locatorId = self.page.get_by_role("textbox", name="Saisissez votre identifiant")
         self.locatorMemorize = self.page.get_by_text("Mémoriser mon identifiant")
         self.locatorButtonNext = self.page.get_by_role("button", name="Suivant")
-        self.locatorButtonConnect = self.page.get_by_role(
-            "button", name="Je me connecte"
-        )
-        self.locatorButtonReconnect = self.page.get_by_role(
-            "link", name="Je me reconnecte"
-        )
-        self.locatorHeaderAccountsPage = self.page.get_by_role(
-            "heading", name="Mes comptes bancaires"
-        )
+        self.locatorButtonConnect = self.page.get_by_role("button", name="Je me connecte")
+        self.locatorButtonReconnect = self.page.get_by_role("link", name="Je me reconnecte")
+        self.locatorHeaderAccountsPage = self.page.get_by_role("heading", name="Mes comptes bancaires")
         self.locatorWrongPass = self.page.get_by_text("Identifiant ou mot de passe")
 
         expectedLocators: list[Locator] = [
@@ -356,24 +305,15 @@ class BoursoScraper:
                 state="visible",
                 timeout=10000,
             )
-            if (
-                self.locatorCookies in expectedLocators
-                and len(self.locatorCookies.all()) > 0
-            ):
+            if self.locatorCookies in expectedLocators and len(self.locatorCookies.all()) > 0:
                 self.logger.debug("Found cookie consent, click no")
                 self.locatorCookies.click()
                 self.page.screenshot(path=self.debugPath / "cookies.png")
                 expectedLocators.remove(self.locatorCookies)
-            elif (
-                self.locatorHeaderAccountsPage in expectedLocators
-                and len(self.locatorHeaderAccountsPage.all()) > 0
-            ):
+            elif self.locatorHeaderAccountsPage in expectedLocators and len(self.locatorHeaderAccountsPage.all()) > 0:
                 self.logger.info("Already connected !")
                 return True
-            elif (
-                self.locatorButtonReconnect in expectedLocators
-                and len(self.locatorButtonReconnect.all()) > 0
-            ):
+            elif self.locatorButtonReconnect in expectedLocators and len(self.locatorButtonReconnect.all()) > 0:
                 self.logger.info("Click reconnect button")
                 self.locatorButtonReconnect.click()
                 expectedLocators.remove(self.locatorButtonReconnect)
@@ -385,10 +325,7 @@ class BoursoScraper:
                 self.logger.debug("Clic submit login id")
                 self.locatorButtonNext.click()
                 expectedLocators.remove(self.locatorId)
-            elif (
-                self.locatorButtonConnect in expectedLocators
-                and len(self.locatorButtonConnect.all()) > 0
-            ):
+            elif self.locatorButtonConnect in expectedLocators and len(self.locatorButtonConnect.all()) > 0:
                 self.logger.debug("Found Button connect")
                 self.logger.debug("Enter password")
                 self.page.screenshot(path=self.debugPath / "passwordpage.png")
