@@ -13,3 +13,4 @@ config.yaml
 debug/
 transactions/
 log/
+tmp/
