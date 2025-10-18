@@ -8,6 +8,7 @@ from pathlib import Path
 import msgspec
 from playwright.sync_api import (
     BrowserContext,
+    Locator,
     Page,
     TimeoutError,
     sync_playwright,
@@ -49,6 +50,13 @@ class BoursoScraper:
         self.browser.close()
         self.playwright.stop()
 
+    def orLocator(self, locators: list[Locator]):
+        mergedLocator = locators[0]
+        for i in range(1, len(locators)):
+            mergedLocator = mergedLocator.or_(locators[i])
+
+        return mergedLocator.first
+
     def cleanAmount(self, amountStr: str) -> Decimal:
         balanceClean = self.regexCleanAmount.sub("", amountStr).replace(",", ".")
 
@@ -68,20 +76,9 @@ class BoursoScraper:
                 self.context.tracing.start(screenshots=True, snapshots=True)
                 self.page = self.context.new_page()
                 self.page.set_default_timeout(30000)
-                url = f"{self.apiUrl}/budget/mouvements"
-                self.logger.debug(f"Load accounts page : {url}")
-                self.page.goto(url)
 
-                try:
-                    self.page.wait_for_selector(
-                        "a.c-info-box__link-wrapper", timeout=4000
-                    )
-                    self.logger.debug("Logged in successfully")
-                    return True
-                except TimeoutError:
-                    self.logger.debug("Not connected. State must be too old.")
-                    self.contextFile.unlink(missing_ok=True)
-                    return self.login()
+                return self.login()
+
             else:
                 self.logger.debug("No state file exists. Try to login.")
                 self.context = self.browser.new_context(accept_downloads=True)
@@ -102,6 +99,13 @@ class BoursoScraper:
         try:
             self.logger.debug("List bank accounts")
             url = f"{self.apiUrl}/budget/mouvements"
+            # self.page.wait_for_url("**", timeout=5000)
+            self.logger.debug(url)
+            self.logger.debug(self.page.url)
+            self.logger.debug("wait for selector")
+            self.page.wait_for_selector("a.c-info-box__link-wrapper", timeout=5000)
+            self.logger.debug(self.page.url)
+
             if self.page.url != url:
                 self.logger.debug(f"Load url {url}")
                 self.page.goto(url)
@@ -315,41 +319,91 @@ class BoursoScraper:
                     break
 
     def login(self):
-        url = f"{self.apiUrl}/connexion/"
-        if self.page.url != url:
-            self.logger.debug(f"Loading {url}")
-            self.page.goto(url)
+        url = f"{self.apiUrl}/budget/mouvements"
+        self.logger.debug(f"Load accounts page : {url}")
+        self.page.goto(url)
 
-        try:
-            # If there is a privacy popup, close it
-            self.page.click(".didomi-continue-without-agreeing", timeout=5000)
-            self.logger.debug("Clicked on privacy validation button")
-        except TimeoutError:
-            pass
-
-        self.page.type("input#form_clientNumber", self.username)
-
-        self.page.screenshot(path=self.debugPath / "loginpage.png")
-
-        self.logger.debug("Clic submit login id")
-        self.page.click("button[data-login-id-submit]")
-        self.page.wait_for_selector(
-            "div.sasmap > ul > li > button > img", state="visible"
+        self.locatorCookies = self.page.get_by_role(
+            "button", name="Continuer sans accepter →"
         )
-        self.decryptPassword()
+        self.locatorId = self.page.get_by_role(
+            "textbox", name="Saisissez votre identifiant"
+        )
+        self.locatorMemorize = self.page.get_by_text("Mémoriser mon identifiant")
+        self.locatorButtonNext = self.page.get_by_role("button", name="Suivant")
+        self.locatorButtonConnect = self.page.get_by_role(
+            "button", name="Je me connecte"
+        )
+        self.locatorHeaderAccountsPage = self.page.get_by_role(
+            "heading", name="Mes comptes bancaires"
+        )
+        self.locatorWrongPass = self.page.get_by_text("Identifiant ou mot de passe")
 
-        time.sleep(2)
-        self.page.screenshot(path=self.debugPath / "passwordpage.png")
+        expectedLocators: list[Locator] = [
+            self.locatorCookies,
+            self.locatorId,
+            self.locatorButtonConnect,
+            self.locatorHeaderAccountsPage,
+        ]
 
-        # click on validate button
-        self.logger.debug("Clic submit password")
-        self.page.click("button[data-login-submit]")
-        time.sleep(3)
+        while True:
+            multiLocator = self.orLocator(expectedLocators)
+            multiLocator.wait_for(
+                state="visible",
+                timeout=10000,
+            )
+            if (
+                self.locatorCookies in expectedLocators
+                and len(self.locatorCookies.all()) > 0
+            ):
+                self.logger.debug("Found cookie consent, click no")
+                self.locatorCookies.click()
+                self.page.screenshot(path=self.debugPath / "cookies.png")
+                expectedLocators.remove(self.locatorCookies)
+            elif (
+                self.locatorHeaderAccountsPage in expectedLocators
+                and len(self.locatorHeaderAccountsPage.all()) > 0
+            ):
+                self.logger.info("Already connected !")
+                return True
+            elif self.locatorId in expectedLocators and len(self.locatorId.all()) > 0:
+                self.logger.debug("Found username input, enter login")
+                self.locatorId.fill(self.username)
+                self.locatorMemorize.click()
+                self.page.screenshot(path=self.debugPath / "loginpage.png")
+                self.logger.debug("Clic submit login id")
+                self.locatorButtonNext.click()
+                expectedLocators.remove(self.locatorId)
+            elif (
+                self.locatorButtonConnect in expectedLocators
+                and len(self.locatorButtonConnect.all()) > 0
+            ):
+                self.logger.debug("Found Button connect")
+                self.logger.debug("Enter password")
+                self.page.screenshot(path=self.debugPath / "passwordpage.png")
+                self.decryptPassword()
 
-        # Wait for an element to appear
-        # TODO: This selector is not always found
-        self.logger.debug("Logged in successfully")
-        self.logger.debug("Saving context")
-        self.context.storage_state(path=self.contextFile)
+                time.sleep(0.3)
 
-        return True
+                # click on validate button
+                self.logger.debug("Clic Connect Button")
+                self.locatorButtonConnect.click()
+                break
+
+        expectedLocators = [self.locatorHeaderAccountsPage, self.locatorWrongPass]
+
+        multiLocator = self.orLocator(expectedLocators)
+        multiLocator.wait_for(
+            state="visible",
+            timeout=10000,
+        )
+        if len(self.locatorHeaderAccountsPage.all()) > 0:
+            self.logger.info("Login successfull!")
+            self.logger.debug("Saving context")
+            self.context.storage_state(path=self.contextFile)
+            return True
+        elif len(self.locatorWrongPass.all()) > 0:
+            self.logger.error("Wrong password!")
+        else:
+            self.logger.error("Unexpected result, login failed.")
+        return False

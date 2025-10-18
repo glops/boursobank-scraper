@@ -71,6 +71,7 @@ def main() -> None:
 
     finally:
         try:
+            boursoScraper.stopTracing()  # type: ignore
             boursoScraper.close()  # type: ignore
         except Exception:
             pass
