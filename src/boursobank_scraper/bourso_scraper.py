@@ -334,6 +334,9 @@ class BoursoScraper:
         self.locatorButtonConnect = self.page.get_by_role(
             "button", name="Je me connecte"
         )
+        self.locatorButtonReconnect = self.page.get_by_role(
+            "link", name="Je me reconnecte"
+        )
         self.locatorHeaderAccountsPage = self.page.get_by_role(
             "heading", name="Mes comptes bancaires"
         )
@@ -344,6 +347,7 @@ class BoursoScraper:
             self.locatorId,
             self.locatorButtonConnect,
             self.locatorHeaderAccountsPage,
+            self.locatorButtonReconnect,
         ]
 
         while True:
@@ -366,6 +370,13 @@ class BoursoScraper:
             ):
                 self.logger.info("Already connected !")
                 return True
+            elif (
+                self.locatorButtonReconnect in expectedLocators
+                and len(self.locatorButtonReconnect.all()) > 0
+            ):
+                self.logger.info("Click reconnect button")
+                self.locatorButtonReconnect.click()
+                expectedLocators.remove(self.locatorButtonReconnect)
             elif self.locatorId in expectedLocators and len(self.locatorId.all()) > 0:
                 self.logger.debug("Found username input, enter login")
                 self.locatorId.fill(self.username)
