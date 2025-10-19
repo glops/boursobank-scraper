@@ -54,15 +54,22 @@ def main() -> None:
     logger.info(f"Headless mode: {config.headless}")
     logger.info(f"Data path: {rootDataPath}")
     try:
-        boursoScraper = BoursoScraper(str(config.username), str(config.password), rootDataPath, config.headless)
+        boursoScraper = BoursoScraper(
+            username=str(config.username),
+            password=str(config.password),
+            rootDataPath=rootDataPath,
+            headless=config.headless,
+            timeout=config.timeoutMs,
+            saveTrace=config.saveTrace,
+        )
 
         if boursoScraper.connect():
             accounts = list(boursoScraper.listAccounts())
             accountsFilePath = rootDataPath / "accounts.json"
             accountsFilePath.write_bytes(msgspec.json.encode(accounts))
             for account in accounts:
-                print(f"{account.name} - {account.balance} - {account.id}")
-                print(f"{account.link}")
+                logger.info(f"{account.name} - {account.balance} - {account.id}")
+                logger.info(f"{account.link}")
                 boursoScraper.saveNewTransactionsForAccount(account)
 
     finally:

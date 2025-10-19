@@ -80,8 +80,11 @@ Ajoutez-y un fichier `config.yaml` avec les informations de connexion à la banq
 ```yaml
 ---
 username: 12345678
-password: 87654321
-headless: false
+password: 87654321 # optionnel
+headless: false # optionnel, défaut : False
+timeoutMs: 15000 # optionnel, défaut : 30000 millisecondes
+saveTrace: true # optionnel, défaut : false
+
 ```
 
 > **Attention : le mot de passe n'est pas crypté !**
@@ -89,6 +92,12 @@ headless: false
 > Il n'est pas obligatoire. Dans ce cas, il sera demandé à chaque exécution.
 
 Le paramètre `headless` peut prendre la valeur `false`. Dans ce cas, le navigateur sera affiché lors du scrapping. Sinon, le chargement aura lieu en tâche de fond.
+
+Le paramètre `timeoutMs` définit le temps maximum d'attente après chaque chargement de page.
+
+Le paramètre `saveTrace` définit si les traces de l'exécution seront sauvegardées dans un fichier `debug/trace.zip`. Par défaut, la trace n'est pas sauvegardée.
+
+> **Attention : le mot de passe est visible dans la trace.**
 
 ## Exécution
 

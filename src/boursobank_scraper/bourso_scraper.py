@@ -21,13 +21,23 @@ from boursobank_scraper.reference_buttons import referenceButtons
 
 
 class BoursoScraper:
-    def __init__(self, username: str, password: str, rootDataPath: Path, headless: bool = True):
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        rootDataPath: Path,
+        headless: bool = True,
+        timeout: int = 30000,
+        saveTrace: bool = False,
+    ):
         self.logger = logging.getLogger(__name__)
 
         self.apiUrl = "https://clients.boursobank.com"
         self.username = username
         self.password = password
         self.rootDataPath = rootDataPath
+        self.timeout = timeout
+        self.saveTrace = saveTrace
         self.debugPath = self.rootDataPath / "debug"
         self.debugPath.mkdir(exist_ok=True)
         self.transactionsPath = self.rootDataPath / "transactions"
@@ -62,51 +72,39 @@ class BoursoScraper:
 
     def connect(self) -> bool:
         try:
-            ######################################
-            ######## Login page ##################
-            ######################################
-
             if self.contextFile.is_file():
                 self.logger.debug("Login state exists. Load it")
-                self.context = self.browser.new_context(storage_state=self.contextFile, accept_downloads=True)
-                self.context.tracing.start(screenshots=True, snapshots=True)
-                self.page = self.context.new_page()
-                self.page.set_default_timeout(30000)
-
-                return self.login()
-
+                contextFile = self.contextFile
             else:
                 self.logger.debug("No state file exists. Try to login.")
-                self.context = self.browser.new_context(accept_downloads=True)
+                contextFile = None
+            self.context = self.browser.new_context(storage_state=contextFile, accept_downloads=True)
+            if self.saveTrace:
                 self.context.tracing.start(screenshots=True, snapshots=True)
-                self.page = self.context.new_page()
-                self.page.set_default_timeout(30000)
-                return self.login()
+            self.page = self.context.new_page()
+            self.page.set_default_timeout(self.timeout)
+
+            return self.login()
+
         except TimeoutError:
             self.stopTracing()
-
-            self.page.screenshot(path=self.debugPath / "timeouterror.png")
             raise
 
     def stopTracing(self):
-        self.context.tracing.stop(path=self.debugPath / "timeouterror_trace.zip")
+        if self.saveTrace:
+            self.context.tracing.stop(path=self.debugPath / "trace.zip")
 
     def listAccounts(self):
         try:
             self.logger.debug("List bank accounts")
             url = f"{self.apiUrl}/budget/mouvements"
-            # self.page.wait_for_url("**", timeout=5000)
-            self.logger.debug(url)
-            self.logger.debug(self.page.url)
-            self.logger.debug("wait for selector")
-            self.page.wait_for_selector("a.c-info-box__link-wrapper", timeout=5000)
-            self.logger.debug(self.page.url)
 
             if self.page.url != url:
                 self.logger.debug(f"Load url {url}")
                 self.page.goto(url)
 
-            self.page.wait_for_selector("a.c-info-box__link-wrapper")
+            self.locatorHeaderAccountsPage = self.page.get_by_role("heading", name="Mes comptes bancaires")
+            self.locatorHeaderAccountsPage.wait_for(state="visible")
 
             accountEls = self.page.query_selector_all("a.c-info-box__link-wrapper")
 
@@ -131,9 +129,7 @@ class BoursoScraper:
                 self.logger.debug(f"Account: {boursoAccount}")
                 yield boursoAccount
         except TimeoutError:
-            self.context.tracing.stop(path=self.debugPath / "timeouterror_trace.zip")
-
-            self.page.screenshot(path=self.debugPath / "timeouterror.png")
+            self.stopTracing()
             raise
 
     def saveNewTransactionsForAccount(self, account: BoursoAccount):
@@ -231,9 +227,7 @@ class BoursoScraper:
             )
             self.logger.info("No more operation")
         except TimeoutError:
-            self.context.tracing.stop(path=self.debugPath / "timeouterror_trace.zip")
-
-            self.page.screenshot(path=self.debugPath / "timeouterror.png")
+            self.stopTracing()
             raise
 
     def decryptPassword(self):
@@ -301,14 +295,10 @@ class BoursoScraper:
 
         while True:
             multiLocator = self.orLocator(expectedLocators)
-            multiLocator.wait_for(
-                state="visible",
-                timeout=10000,
-            )
+            multiLocator.wait_for(state="visible")
             if self.locatorCookies in expectedLocators and len(self.locatorCookies.all()) > 0:
                 self.logger.debug("Found cookie consent, click no")
                 self.locatorCookies.click()
-                self.page.screenshot(path=self.debugPath / "cookies.png")
                 expectedLocators.remove(self.locatorCookies)
             elif self.locatorHeaderAccountsPage in expectedLocators and len(self.locatorHeaderAccountsPage.all()) > 0:
                 self.logger.info("Already connected !")
@@ -321,14 +311,12 @@ class BoursoScraper:
                 self.logger.debug("Found username input, enter login")
                 self.locatorId.fill(self.username)
                 self.locatorMemorize.click()
-                self.page.screenshot(path=self.debugPath / "loginpage.png")
                 self.logger.debug("Clic submit login id")
                 self.locatorButtonNext.click()
                 expectedLocators.remove(self.locatorId)
             elif self.locatorButtonConnect in expectedLocators and len(self.locatorButtonConnect.all()) > 0:
                 self.logger.debug("Found Button connect")
                 self.logger.debug("Enter password")
-                self.page.screenshot(path=self.debugPath / "passwordpage.png")
                 self.decryptPassword()
 
                 time.sleep(0.3)
@@ -341,10 +329,7 @@ class BoursoScraper:
         expectedLocators = [self.locatorHeaderAccountsPage, self.locatorWrongPass]
 
         multiLocator = self.orLocator(expectedLocators)
-        multiLocator.wait_for(
-            state="visible",
-            timeout=10000,
-        )
+        multiLocator.wait_for(state="visible")
         if len(self.locatorHeaderAccountsPage.all()) > 0:
             self.logger.info("Login successfull!")
             self.logger.debug("Saving context")
