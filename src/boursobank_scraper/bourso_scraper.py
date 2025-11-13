@@ -49,7 +49,7 @@ class BoursoScraper:
 
         self.logger.debug("Start playwright and chromium")
         self.playwright = sync_playwright().start()
-        self.browser = self.playwright.chromium.launch(headless=headless)
+        self.browser = self.playwright.chromium.launch(headless=headless, slow_mo=500)
         self.context: BrowserContext
         self.page: Page
 
@@ -212,14 +212,15 @@ class BoursoScraper:
                     # If no more operation has been found, stop.
                     break
                 else:
-                    nextPageLink = self.page.query_selector("li.list__movement__range-summary > a")
-                    if nextPageLink is None:
+                    nextPageLink = self.page.get_by_role("link", name="Mouvements précédents")
+
+                    if nextPageLink.count() == 0:
                         self.logger.debug("No next page link found")
                         break
                     self.logger.info("Click next page link")
                     nextPageLink.click()
                     time.sleep(1)
-                    nextPageLink = self.page.query_selector("li.list__movement__range-summary > a")
+                    nextPageLink.wait_for(state="visible")
                     self.logger.info("Load done")
 
             self.logger.info(
