@@ -53,7 +53,7 @@ Installation du navigateur Chromium pour playwright.
 playwright-bbs install chromium
 ```
 
-> La commande playwright-bbs est identique à la commande playwright du projet [Playwright](https://playwright.dev/python/). Elle est juste nommé différemment pour ne pas interférer avec une autre version qui serait installée en parallèle.
+> La commande playwright-bbs est identique à la commande playwright du projet [Playwright](https://playwright.dev/python/). Elle est juste nommée différemment pour ne pas interférer avec une autre version qui serait installée en parallèle.
 
 ### Mise à jour
 

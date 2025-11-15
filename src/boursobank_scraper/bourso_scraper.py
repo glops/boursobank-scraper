@@ -141,6 +141,8 @@ class BoursoScraper:
         newOperationCount = 0
         newPendingOperationCount = 0
 
+        checkExistingCount = 55
+
         oldAuthorizationPath.mkdir(parents=True, exist_ok=True)
         newAuthorizationPath.mkdir(parents=True, exist_ok=True)
         for newAuthoPath in newAuthorizationPath.glob("*.json"):
@@ -159,8 +161,11 @@ class BoursoScraper:
 
             countExisting = 0
 
+            nextPageLink = self.page.get_by_role("link", name="Mouvements précédents")
+            loadingMessage = self.page.get_by_text("Récupération des mouvements")
+
             while True:
-                operationCount = len(listOperationId)
+                # operationCount = len(listOperationId)
                 rowTransactionEls = self.page.query_selector_all("ul.list__movement > li.list-operation-item")
 
                 for rowEl in rowTransactionEls:
@@ -171,57 +176,79 @@ class BoursoScraper:
                     if operationId in listOperationSeenId:
                         continue
                     listOperationSeenId.add(operationId)
-                    if operationId in listPendingOperationId:
-                        # The operation is pending and the file already exist in the old folder
-                        transactionPath = oldAuthorizationPath / f"{operationId}.json"
-                        transactionPath.rename(newAuthorizationPath / transactionPath.name)
-                    elif operationId not in listOperationId:
-                        listOperationId.add(operationId)
-
-                        with self.page.expect_response(re.compile(".*operation.*")) as response_info:
-                            labelEl.click()
-                        try:
-                            operation = msgspec.json.decode(response_info.value.body(), type=BoursoApiOperation)
-                            opDate = operation.getDate()
-                            if (
-                                operation.operation.status.id == "authorization"
-                                or "READ_ONLY" in operation.operation.flags
-                            ):
-                                newPendingOperationCount += 1
-                                transactionPath = newAuthorizationPath / f"{operation.operation.id}.json"
-                            elif opDate is not None:
-                                newOperationCount += 1
-                                year, month, day = opDate.split("-")
-                                transactionPath = (
-                                    accountTransacPath / year / month / day / f"{operation.operation.id}.json"
-                                )
-                            else:
-                                transactionPath = accountTransacPath / "unknown_date" / f"{operation.operation.id}.json"
-                        except msgspec.ValidationError:
-                            transactionPath = accountTransacPath / "invalid" / f"{operationId}.json"
-
-                        if not transactionPath.exists():
-                            transactionPath.parent.mkdir(exist_ok=True, parents=True)
-                            self.logger.debug(f"Saving {transactionPath}")
-                            transactionPath.write_bytes(response_info.value.body())
-                    elif operationId in listOperationId:
-                        self.logger.debug(f"Operation {operationId} already exists, skipping")
+                    if operationId in listOperationId:
                         countExisting += 1
+                        self.logger.debug(
+                            f"Operation {operationId} already exists ({countExisting}/{checkExistingCount}), skipping"
+                        )
 
-                if operationCount == len(listOperationId) or countExisting > 50:
-                    # If no more operation has been found, stop.
+                if countExisting >= checkExistingCount:
+                    # Reach expected existing operations count. Stop loading more pages
                     break
                 else:
-                    nextPageLink = self.page.get_by_role("link", name="Mouvements précédents")
-
                     if nextPageLink.count() == 0:
                         self.logger.debug("No next page link found")
                         break
                     self.logger.info("Click next page link")
+                    time.sleep(0.5)
                     nextPageLink.click()
-                    time.sleep(1)
-                    nextPageLink.wait_for(state="visible")
-                    self.logger.info("Load done")
+
+                    multiLocator = self.orLocator([nextPageLink, loadingMessage])
+
+                    self.logger.info("Wait for loading msg to appear")
+                    multiLocator.wait_for(state="visible")
+                    self.logger.info("Wait for loading msg to disappear")
+                    loadingMessage.wait_for(state="hidden")
+                    time.sleep(0.5)
+                    self.logger.info("Load next page done")
+
+            # At this point all new transactions are shown on the page.
+            # We get the list and reverse it to start from the oldest
+            revRowTransactionEls = self.page.query_selector_all("ul.list__movement > li.list-operation-item")[::-1]
+
+            for rowEl in revRowTransactionEls:
+                labelEl = rowEl.query_selector(".list-operation-item__label")
+                operationId = rowEl.get_attribute("data-id")
+                if labelEl is None or operationId is None:
+                    continue
+                if operationId in listPendingOperationId:
+                    # The operation is pending and the file already exist in the old folder.
+                    # We move it to the new folder back
+                    transactionPath = oldAuthorizationPath / f"{operationId}.json"
+                    transactionPath.rename(newAuthorizationPath / transactionPath.name)
+                    continue
+                elif operationId in listOperationId:
+                    # The operation already exist. Skip
+                    continue
+
+                # New transaction. Click on the link to trigger the loading of details
+                with self.page.expect_response(re.compile(".*operation.*")) as response_info:
+                    labelEl.click()
+                try:
+                    operation = msgspec.json.decode(response_info.value.body(), type=BoursoApiOperation)
+                    opDate = operation.getDate()
+                    if operation.operation.status.id == "authorization" or "READ_ONLY" in operation.operation.flags:
+                        # The operation is an authorization. It goes in the new authorization folder.
+                        newPendingOperationCount += 1
+                        transactionPath = newAuthorizationPath / f"{operation.operation.id}.json"
+                    elif opDate is not None:
+                        # A date is found, the transaction is saved into year / month / day hierarchy
+                        newOperationCount += 1
+                        year, month, day = opDate.split("-")
+                        transactionPath = accountTransacPath / year / month / day / f"{operation.operation.id}.json"
+                    else:
+                        # Unknown date
+                        transactionPath = accountTransacPath / "unknown_date" / f"{operation.operation.id}.json"
+                except msgspec.ValidationError:
+                    # Json cannot be parsed. Save it to invalid folder
+                    transactionPath = accountTransacPath / "invalid" / f"{operationId}.json"
+
+                if not transactionPath.exists():
+                    # Create the folder is needed
+                    transactionPath.parent.mkdir(exist_ok=True, parents=True)
+                    self.logger.debug(f"Saving {transactionPath}")
+                    # Save the json
+                    transactionPath.write_bytes(response_info.value.body())
 
             self.logger.info(
                 f"Retrieve {newOperationCount} new operations and {newPendingOperationCount} new pending operations"
