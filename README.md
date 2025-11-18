@@ -81,15 +81,16 @@ Ajoutez-y un fichier `config.yaml` avec les informations de connexion à la banq
 ---
 username: 12345678
 password: 87654321 # optionnel
+password_by_keyring: true # optionnel, ajoute la gestion du keyring
 headless: false # optionnel, défaut : False
 timeoutMs: 15000 # optionnel, défaut : 30000 millisecondes
 saveTrace: true # optionnel, défaut : false
 
 ```
 
-> **Attention : le mot de passe n'est pas crypté !**
+> le mot de passe est chiffré si `password_by_keyring: true`.
 >
-> Il n'est pas obligatoire. Dans ce cas, il sera demandé à chaque exécution.
+> `password` et `password_by_keyring:` ne sont pas obligatoire. Dans ce cas, il sera demandé à chaque exécution.
 
 Le paramètre `headless` peut prendre la valeur `false`. Dans ce cas, le navigateur sera affiché lors du scrapping. Sinon, le chargement aura lieu en tâche de fond.
 
@@ -114,8 +115,19 @@ Ou, appelez directement la commande avec le répertoire data en paramètre :
 boursobank-scraper --data-folder ~/boursobank-data
 ```
 
+Pour ajouter le mot de passe dans le keyring:
 
-Indiquez le mot de passe si vous ne l'avez pas spécifié dans le fichier `config.yaml`.
+```bash
+python -m keyring set boursobank <BoursoBank ID>
+```
+
+Pour le récupérer:
+
+```bash
+python -m keyring get boursobank <BoursoBank ID>
+```
+
+Sinon, indiquez le mot de passe si vous ne l'avez pas spécifié dans le fichier `config.yaml`.
 
 Si vous avez spécifié `false` pour `headless`, le navigateur sera affiché lors du scrapping. Sinon, le chargement aura lieu en tâche de fond.
 
@@ -137,7 +149,3 @@ Un fichier `accounts.json` est régénéré à chaque exécution. Ilcontient la 
 - `balance`: solde du compte.
 - `link`: lien vers la page du compte.
 
-
-## Todo
-
-- Utiliser le module [keyring](https://pypi.org/project/keyring/) pour stocker les informations de connexion dans le trousseau.
