@@ -143,7 +143,7 @@ Une fois le script exécuté, les fichiers de transactions sont disponibles dans
 
 #### Synthèse des comptes
 
-Un fichier `accounts.json` est régénéré à chaque exécution. Ilcontient la liste des comptes bancaires. Chaque compte est représenté par un objet JSON avec les informations suivantes :
+Un fichier `accounts.json` est régénéré à chaque exécution. Il contient la liste des comptes bancaires. Chaque compte est représenté par un objet JSON avec les informations suivantes :
 - `id`: identifiant unique du compte.
 - `name`: nom du compte.
 - `balance`: solde du compte.
