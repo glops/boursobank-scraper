@@ -81,16 +81,16 @@ Ajoutez-y un fichier `config.yaml` avec les informations de connexion à la banq
 ---
 username: 12345678
 password: 87654321 # optionnel
-password_by_keyring: true # optionnel, ajoute la gestion du keyring
+password_by_keyring: true # optionnel, défaut : False
 headless: false # optionnel, défaut : False
 timeoutMs: 15000 # optionnel, défaut : 30000 millisecondes
 saveTrace: true # optionnel, défaut : false
 
 ```
 
-> le mot de passe est chiffré si `password_by_keyring: true`.
+> le mot de passe est chiffré dans le keyring si `password_by_keyring: true`.
 >
-> `password` et `password_by_keyring:` ne sont pas obligatoire. Dans ce cas, il sera demandé à chaque exécution.
+> `password` et `password_by_keyring` ne sont pas obligatoire. Si absents, le mot de passe sera demandé à chaque exécution.
 
 Le paramètre `headless` peut prendre la valeur `false`. Dans ce cas, le navigateur sera affiché lors du scrapping. Sinon, le chargement aura lieu en tâche de fond.
 
