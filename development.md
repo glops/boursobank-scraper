@@ -8,7 +8,12 @@ uv version --bump major
 uv version --bump minor
 uv version --bump patch
 ```
-Puis push
+Puis commit et push
+```bash
+git add pyproject.toml uv.lock
+git commit -m "bump version"
+git push
+```
 
 ## Publication de la version
 
