@@ -106,17 +106,19 @@ class BoursoScraper:
             self.locatorHeaderAccountsPage = self.page.get_by_text("Mes comptes bancaires", exact=True)
             self.locatorHeaderAccountsPage.wait_for(state="visible")
 
-            accountEls = self.page.query_selector_all("a.c-info-box__link-wrapper")
+            locatorAccounts = self.page.locator("css=a.c-info-box__link-wrapper")
 
-            for accountEl in accountEls:
+            locatorAccounts.first.wait_for(state="visible")
+
+            for accountEl in locatorAccounts.all():
                 name = (accountEl.get_attribute("title") or "").strip()
-                balanceEl = accountEl.query_selector("span.c-info-box__account-balance")
-                if balanceEl is None:
+                balanceEl = accountEl.locator("css=span.c-info-box__account-balance")
+                if balanceEl.count() == 0:
                     # This is not an account (insurrance). Skip
                     continue
                 balance = self.cleanAmount(balanceEl.text_content() or "")
-                accountLabelEl = accountEl.query_selector("span.c-info-box__account-label")
-                if accountLabelEl is None:
+                accountLabelEl = accountEl.locator("css=span.c-info-box__account-label")
+                if accountLabelEl.count() == 0:
                     # This is not an account (Tous mes comptes). Skip
                     continue
                 guid = accountLabelEl.get_attribute("data-account-label")
@@ -166,12 +168,12 @@ class BoursoScraper:
 
             while True:
                 # operationCount = len(listOperationId)
-                rowTransactionEls = self.page.query_selector_all("ul.list__movement > li.list-operation-item")
+                locatorRowTransaction = self.page.locator("css=ul.list__movement > li.list-operation-item")
 
-                for rowEl in rowTransactionEls:
-                    labelEl = rowEl.query_selector(".list-operation-item__label")
+                for rowEl in locatorRowTransaction.all():
+                    labelEl = rowEl.locator(".list-operation-item__label")
                     operationId = rowEl.get_attribute("data-id")
-                    if labelEl is None or operationId is None:
+                    if labelEl.count() == 0 or operationId is None:
                         continue
                     if operationId in listOperationSeenId:
                         continue
