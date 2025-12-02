@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import msgspec
+import keyring
 
 from boursobank_scraper.bourso_scraper import BoursoScraper
 from boursobank_scraper.config import Config
@@ -37,7 +38,14 @@ def main() -> None:
 
     config = msgspec.yaml.decode(configPath.read_text("utf8"), type=Config)
 
-    if config.password is None:
+    if getattr(config, "password_by_keyring", False):
+        usernameStr = str(config.username)
+        password = keyring.get_password('boursobank', usernameStr)
+        if not password:
+            print(f"Erreur : mot de passe pour {config.username} introuvable dans le keyring")
+            exit(1)
+        config.password = password
+    elif config.password is None:
         try:
             config.password = int(getpass.getpass("Password:"))
         except ValueError:
