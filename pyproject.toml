@@ -1,6 +1,6 @@
 [project]
 name = "boursobank-scraper"
-version = "0.5.0"
+version = "0.5.1"
 description = "Outil pour récupérer les données de transaction depuis le site de BoursoBank"
 readme = "README.md"
 authors = [
