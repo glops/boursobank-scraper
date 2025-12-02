@@ -103,7 +103,7 @@ class BoursoScraper:
                 self.logger.debug(f"Load url {url}")
                 self.page.goto(url)
 
-            self.locatorHeaderAccountsPage = self.page.get_by_role("heading", name="Mes comptes bancaires")
+            self.locatorHeaderAccountsPage = self.page.get_by_text("Mes comptes bancaires", exact=True)
             self.locatorHeaderAccountsPage.wait_for(state="visible")
 
             accountEls = self.page.query_selector_all("a.c-info-box__link-wrapper")
@@ -310,7 +310,7 @@ class BoursoScraper:
         self.locatorButtonNext = self.page.get_by_role("button", name="Suivant")
         self.locatorButtonConnect = self.page.get_by_role("button", name="Je me connecte")
         self.locatorButtonReconnect = self.page.get_by_role("link", name="Je me reconnecte")
-        self.locatorHeaderAccountsPage = self.page.get_by_role("heading", name="Mes comptes bancaires")
+        self.locatorHeaderAccountsPage = self.page.get_by_text("Mes comptes bancaires", exact=True)
         self.locatorWrongPass = self.page.get_by_text("Identifiant ou mot de passe")
 
         expectedLocators: list[Locator] = [
