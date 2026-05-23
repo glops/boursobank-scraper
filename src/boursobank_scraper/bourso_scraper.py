@@ -245,8 +245,11 @@ class BoursoScraper:
                     else:
                         # Unknown date
                         transactionPath = accountTransacPath / "unknown_date" / f"{operation.operation.id}.json"
-                except msgspec.ValidationError:
-                    # Json cannot be parsed. Save it to invalid folder
+                except (msgspec.ValidationError, msgspec.DecodeError):
+                    # Json cannot be parsed (validation failed OR decode error,
+                    # which happens when BoursoBank serves an HTML error page
+                    # instead of JSON). Save it to invalid folder so the scrape
+                    # keeps going for other accounts instead of crashing.
                     transactionPath = accountTransacPath / "invalid" / f"{operationId}.json"
 
                 if not transactionPath.exists():
