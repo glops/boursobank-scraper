@@ -43,7 +43,7 @@ class BoursoScraper:
         self.transactionsPath = self.rootDataPath / "transactions"
         self.transactionsPath.mkdir(exist_ok=True)
 
-        self.regexCleanAmount = re.compile(r"[^0-9,-]+", flags=re.I)
+        self.regexCleanAmount = re.compile(r"[^0-9,\-−–—‐]+", flags=re.I)
 
         self.contextFile = self.debugPath / "context.json"
 
@@ -66,8 +66,12 @@ class BoursoScraper:
         return mergedLocator.first
 
     def cleanAmount(self, amountStr: str) -> Decimal:
-        balanceClean = self.regexCleanAmount.sub("", amountStr).replace(",", ".")
-
+        # BoursoBank renders debit balances with U+2212 (MINUS SIGN), not the
+        # hyphen-minus ASCII character. Normalise the common Unicode minus
+        # variants to "-" before stripping non-numeric chars, otherwise the
+        # sign is dropped and a -6.23 EUR balance is reported as +6.23 EUR.
+        normalized = amountStr.translate(str.maketrans({"−": "-", "–": "-", "—": "-", "‐": "-"}))
+        balanceClean = self.regexCleanAmount.sub("", normalized).replace(",", ".")
         return Decimal(balanceClean).quantize(Decimal("1.00"))
 
     def connect(self) -> bool:
@@ -241,8 +245,11 @@ class BoursoScraper:
                     else:
                         # Unknown date
                         transactionPath = accountTransacPath / "unknown_date" / f"{operation.operation.id}.json"
-                except msgspec.ValidationError:
-                    # Json cannot be parsed. Save it to invalid folder
+                except (msgspec.ValidationError, msgspec.DecodeError):
+                    # Json cannot be parsed (validation failed OR decode error,
+                    # which happens when BoursoBank serves an HTML error page
+                    # instead of JSON). Save it to invalid folder so the scrape
+                    # keeps going for other accounts instead of crashing.
                     transactionPath = accountTransacPath / "invalid" / f"{operationId}.json"
 
                 if not transactionPath.exists():
