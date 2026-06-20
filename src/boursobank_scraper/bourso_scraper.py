@@ -306,7 +306,7 @@ class BoursoScraper:
         self.logger.debug(f"Load accounts page : {url}")
         self.page.goto(url)
 
-        self.locatorCookies = self.page.get_by_role("button", name="Continuer sans accepter →")
+        self.locatorCookies = self.page.get_by_role("button", name="Continuer sans accepter")
         self.locatorId = self.page.get_by_role("textbox", name="Saisissez votre identifiant")
         self.locatorMemorize = self.page.get_by_text("Mémoriser mon identifiant")
         self.locatorButtonNext = self.page.get_by_role("button", name="Suivant")
