@@ -310,7 +310,9 @@ class BoursoScraper:
         self.locatorId = self.page.get_by_role("textbox", name="Saisissez votre identifiant")
         self.locatorMemorize = self.page.get_by_text("Mémoriser mon identifiant")
         self.locatorButtonNext = self.page.get_by_role("button", name="Suivant")
-        self.locatorButtonConnect = self.page.get_by_role("button", name="Je me connecte")
+        self.locatorButtonConnect = self.page.get_by_role(
+            "button", name=re.compile("(Je me connecte|Se connecter).*", re.IGNORECASE)
+        )
         self.locatorButtonReconnect = self.page.get_by_role("link", name="Je me reconnecte")
         self.locatorHeaderAccountsPage = self.page.get_by_text("Mes comptes bancaires", exact=True)
         self.locatorWrongPass = self.page.get_by_text("Identifiant ou mot de passe")
