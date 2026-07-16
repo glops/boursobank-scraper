@@ -7,3 +7,5 @@ class Config(msgspec.Struct):
     headless: bool = True
     timeoutMs: int = 30000
     saveTrace: bool = False
+    ofxNbMonthsBefore: int = 2
+    ofxNbMonthsAfter: int = 1

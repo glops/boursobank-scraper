@@ -1,6 +1,9 @@
 import logging
 import re
 import time
+from datetime import datetime, timedelta
+import calendar
+
 from decimal import Decimal
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -29,6 +32,8 @@ class BoursoScraper:
         headless: bool = True,
         timeout: int = 30000,
         saveTrace: bool = False,
+        ofxNbMonthsBefore: int = 2,
+        ofxNbMonthsAfter: int = 1,
     ):
         self.logger = logging.getLogger(__name__)
 
@@ -38,6 +43,8 @@ class BoursoScraper:
         self.rootDataPath = rootDataPath
         self.timeout = timeout
         self.saveTrace = saveTrace
+        self.ofxNbMonthsBefore = ofxNbMonthsBefore
+        self.ofxNbMonthsAfter = ofxNbMonthsAfter
         self.debugPath = self.rootDataPath / "debug"
         self.debugPath.mkdir(exist_ok=True)
         self.transactionsPath = self.rootDataPath / "transactions"
@@ -134,7 +141,7 @@ class BoursoScraper:
             self.stopTracing()
             raise
 
-    def saveNewTransactionsForAccount(self, account: BoursoAccount):
+    def saveAccountTransactionsAsJson(self, account: BoursoAccount):
         self.logger.info(f"Saving new transactions for account: {account.name}")
         accountTransacPath = self.transactionsPath / account.id
         authorizationPath = accountTransacPath / "authorization"
@@ -256,6 +263,84 @@ class BoursoScraper:
                 f"Retrieve {newOperationCount} new operations and {newPendingOperationCount} new pending operations"
             )
             self.logger.info("No more operation")
+        except TimeoutError:
+            self.stopTracing()
+            raise
+
+    def saveAccountTransactionsAsOfx(self, account: BoursoAccount):
+        self.logger.info(f"Exporting OFX for account: {account.name}")
+        try:
+            if self.page.url != account.link:
+                self.logger.debug(f"opening transaction details page : {account.link}")
+                self.page.goto(account.link)
+
+            locatorExportLink = self.page.get_by_role("link", name="Exporter les opérations")
+            if locatorExportLink.count() == 0:
+                locatorExportLink = self.page.get_by_role("button", name="Exporter les opérations")
+
+            locatorExportLink.first.wait_for(state="visible")
+            self.logger.debug("Click 'Exporter les opérations'")
+            locatorExportLink.first.click()
+
+            if account.id == "all":
+                self.logger.debug("Click 'Comptes' field")
+                locatorAccountsField = self.page.get_by_text("Sélectionner un compte/carte")
+                locatorAccountsField.first.wait_for(state="visible")
+                locatorAccountsField.first.click()
+
+                locatorAccountsField = self.page.get_by_text("Tout sélectionner", exact=True)
+                locatorAccountsField.first.wait_for(state="visible")
+                locatorAccountsField.first.click()
+
+                locatorAccountsField = self.page.get_by_text("Tous les comptes/cartes")
+                locatorAccountsField.first.wait_for(state="visible")
+                locatorAccountsField.first.click()
+
+            # From date = today minus ofxNbMonthsBefore months, at first of month.
+            today = datetime.now()
+            previousMonth = today.month - self.ofxNbMonthsBefore
+            previousMonthYear = today.year + (previousMonth - 1) // 12
+            previousMonth = (previousMonth - 1) % 12 + 1
+            fromDateStr = datetime(previousMonthYear, previousMonth, 1).strftime("%d/%m/%Y")
+
+            self.logger.debug(f"Fill 'movementSearch_fromDate' with {fromDateStr}")
+            locatorFromDate = self.page.locator("css=#movementSearch_fromDate")
+            locatorFromDate.wait_for(state="visible")
+            locatorFromDate.click()
+            locatorFromDate.press("Control+a")
+            locatorFromDate.press("Delete")
+            locatorFromDate.press_sequentially(fromDateStr)
+            locatorFromDate.press("Tab")
+
+            # Compute the last day of the month following the current month + ofxNbMonthsAfter months
+            # = 1st day in (ofxNbMonthsAfter + 1) months minus 1 day
+            nextMonth = today.month + self.ofxNbMonthsAfter + 1
+            nextMonthYear = today.year + (nextMonth - 1) // 12
+            nextMonth = (nextMonth - 1) % 12 + 1
+            toDateStr = (datetime(nextMonthYear, nextMonth, 1) - timedelta(days=1)).strftime("%d/%m/%Y")
+
+            self.logger.debug(f"Fill 'movementSearch_toDate' with {toDateStr}")
+            locatorToDate = self.page.locator("css=#movementSearch_toDate")
+            locatorToDate.wait_for(state="visible")
+            locatorToDate.click()
+            locatorToDate.press("Control+a")
+            locatorToDate.press("Delete")
+            locatorToDate.press_sequentially(toDateStr)
+            locatorToDate.press("Tab")
+
+            self.logger.debug("Click 'OFX' button")
+            self.page.click('div[data-name="3"] .c-chip')
+
+            self.transactionsPath.mkdir(parents=True, exist_ok=True)
+
+            self.logger.debug("Click 'Exporter' button")
+            with self.page.expect_download() as download_info:
+                self.page.click('#movementSearch_submit')
+                download = download_info.value
+                timestamp = time.strftime("%Y-%m-%d_%H%M%S")
+                ofxPath = self.transactionsPath / f"{account.name}_{timestamp}.ofx"
+                download.save_as(ofxPath)
+                self.logger.info(f"Saved OFX export to '{ofxPath}'")
         except TimeoutError:
             self.stopTracing()
             raise
